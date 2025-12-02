@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torchvision import transforms
+from PIL import Image
 import cv2
 import numpy as np
 import time
@@ -99,17 +100,38 @@ class WebcamPredictor:
         
         # Initialize sorting mechanism
         self.sorting_mechanism = SortingMechanism()
+        
+        # Setup preprocessing transform - MUST MATCH TRAINING/VALIDATION EXACTLY
+        # This is the EXACT same transform used in validation/testing
+        self.preprocess = transforms.Compose([
+            transforms.ToPILImage(),             # Convert numpy array to PIL Image
+            transforms.Resize((224, 224)),      # Resize to model input size
+            transforms.ToTensor(),              # Convert to 0-1 Tensor
+            transforms.Normalize(               # EXACT SAME mean/std as training
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225]
+            )
+        ])
 
     def preprocess_image(self, img):
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img = cv2.resize(img, (224, 224))
-        img = img.astype(np.float32) / 255.0
-        mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-        std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
-        img = (img - mean) / std
-        img = np.transpose(img, (2, 0, 1))
-        img_tensor = torch.from_numpy(img).unsqueeze(0).float().to(self.device)
-        return img_tensor
+        """
+        Preprocess image for inference.
+        Fixes 3 traps:
+        1. BGR to RGB conversion (OpenCV uses BGR, model expects RGB)
+        2. Exact same normalization as training (using torchvision transforms)
+        3. Adds batch dimension
+        """
+        # Trap 1 Fix: Convert BGR (OpenCV default) to RGB
+        rgb_frame = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        
+        # Trap 2 & 3 Fix: Use exact same transforms as training/validation
+        # This handles normalization, resizing, and tensor conversion
+        input_tensor = self.preprocess(rgb_frame)
+        
+        # Trap 3 Fix: Add batch dimension (1, 3, 224, 224)
+        input_batch = input_tensor.unsqueeze(0).to(self.device)
+        
+        return input_batch
 
     def predict_frame(self, frame):
         try:
