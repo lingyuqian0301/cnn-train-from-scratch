@@ -29,6 +29,60 @@ class CNN(nn.Module):
         x = self.classifier(x)
         return x
 
+class SortingMechanism:
+    """Simulates a sorting mechanism that maps detected classes to bins"""
+    def __init__(self):
+        # Define bin mappings based on waste categories
+        self.bin_mapping = {
+            # Bin A: Recyclables (Paper, Cardboard, Plastic, Glass, Metal)
+            'paper': 'Bin A (Recyclables)',
+            'cardboard': 'Bin A (Recyclables)',
+            'plastic': 'Bin A (Recyclables)',
+            'glass': 'Bin A (Recyclables)',
+            'metal': 'Bin A (Recyclables)',
+            
+            # Bin B: Hazardous/Electronics (Battery)
+            'battery': 'Bin B (Hazardous)',
+            
+            # Bin C: Organic/Biological Waste
+            'biological': 'Bin C (Organic)',
+            
+            # Bin D: Textiles (Clothes, Shoes)
+            'clothes': 'Bin D (Textiles)',
+            'shoes': 'Bin D (Textiles)',
+            
+            # Bin E: General Trash
+            'trash': 'Bin E (General Waste)'
+        }
+    
+    def get_sorting_instruction(self, class_name):
+        """Returns the sorting instruction for a given class"""
+        bin_assignment = self.bin_mapping.get(class_name.lower(), 'Bin E (General Waste)')
+        return f"Move to {bin_assignment}"
+    
+    def get_bin_color(self, class_name):
+        """Returns a color for the bin assignment (BGR format for OpenCV)"""
+        bin_assignment = self.bin_mapping.get(class_name.lower(), 'Bin E (General Waste)')
+        
+        color_map = {
+            'Bin A (Recyclables)': (0, 255, 0),      # Green
+            'Bin B (Hazardous)': (0, 0, 255),       # Red
+            'Bin C (Organic)': (0, 165, 255),        # Orange
+            'Bin D (Textiles)': (255, 0, 255),       # Magenta
+            'Bin E (General Waste)': (128, 128, 128) # Gray
+        }
+        
+        return color_map.get(bin_assignment, (128, 128, 128))
+    
+    def get_verification_status(self, confidence):
+        """Returns verification status message based on confidence level"""
+        if confidence >= 0.75:
+            return "AUTO CLASSIFIED", (0, 255, 0)  # Green - Direct classification
+        elif confidence >= 0.5:
+            return "NEEDS VERIFICATION", (0, 165, 255)  # Orange - Verify before sorting
+        else:
+            return "MANUAL IDENTIFICATION REQUIRED", (0, 0, 255)  # Red - Manual handling
+
 class WebcamPredictor:
     def __init__(self, model_path):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -42,6 +96,9 @@ class WebcamPredictor:
         self.model.load_state_dict(checkpoint['model_state_dict'])
         self.model.to(self.device)
         self.model.eval()
+        
+        # Initialize sorting mechanism
+        self.sorting_mechanism = SortingMechanism()
 
     def preprocess_image(self, img):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -74,12 +131,29 @@ class WebcamPredictor:
             print(f"Could not read image: {image_path}")
             return
         predicted_class, confidence = self.predict_frame(image)
+        verification_status, status_color = self.sorting_mechanism.get_verification_status(confidence)
+        
         print(f"Prediction: {predicted_class}, Confidence: {confidence:.2%}")
+        print(f"Status: {verification_status}")
+        
         # Show image with prediction
         font = cv2.FONT_HERSHEY_SIMPLEX
         display = image.copy()
-        cv2.putText(display, f"Class: {predicted_class}", (20, 40), font, 0.5, (0, 255, 0), 2)
-        cv2.putText(display, f"Confidence: {confidence:.2%}", (20, 80), font, 0.5, (0, 255, 0), 2)
+        
+        if confidence >= 0.5:
+            sorting_instruction = self.sorting_mechanism.get_sorting_instruction(predicted_class)
+            bin_color = self.sorting_mechanism.get_bin_color(predicted_class)
+            print(f"Sorting Instruction: {sorting_instruction}")
+            
+            cv2.putText(display, f"Class: {predicted_class}", (20, 40), font, 0.5, (0, 255, 0), 2)
+            cv2.putText(display, f"Confidence: {confidence:.2%}", (20, 80), font, 0.5, (0, 255, 0), 2)
+            cv2.putText(display, verification_status, (20, 120), font, 0.5, status_color, 2)
+            cv2.putText(display, sorting_instruction, (20, 160), font, 0.5, bin_color, 2)
+        else:
+            cv2.putText(display, f"Predicted: {predicted_class}", (20, 40), font, 0.5, (0, 0, 255), 2)
+            cv2.putText(display, f"Confidence: {confidence:.2%}", (20, 80), font, 0.5, (0, 0, 255), 2)
+            cv2.putText(display, verification_status, (20, 120), font, 0.5, status_color, 2)
+        
         cv2.imshow("Sample Image Prediction", display)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
@@ -112,14 +186,67 @@ class WebcamPredictor:
             predicted_class, confidence = self.predict_frame(frame)
 
             if predicted_class is not None:
+                # Get verification status based on confidence
+                verification_status, status_color = self.sorting_mechanism.get_verification_status(confidence)
+                
                 overlay = frame.copy()
-                cv2.rectangle(overlay, (10, 10), (400, 90), (0, 0, 0), -1)
-                alpha = 0.6
-                frame = cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0)
                 font = cv2.FONT_HERSHEY_SIMPLEX
-                cv2.putText(frame, f"Class: {predicted_class}", (20, 40), font, 0.8, (0, 255, 0), 2)
-                cv2.putText(frame, f"Confidence: {confidence:.2%}", (20, 70), font, 0.8, (0, 255, 0), 2)
-                cv2.putText(frame, f"FPS: {fps:.1f}", (20, 100), font, 0.8, (0, 255, 0), 2)
+                
+                if confidence >= 0.75:
+                    # High confidence (>= 0.75): Direct classification
+                    sorting_instruction = self.sorting_mechanism.get_sorting_instruction(predicted_class)
+                    bin_color = self.sorting_mechanism.get_bin_color(predicted_class)
+                    
+                    cv2.rectangle(overlay, (10, 10), (550, 170), (0, 0, 0), -1)
+                    alpha = 0.7
+                    frame = cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0)
+                    
+                    # Display classification info
+                    cv2.putText(frame, f"Class: {predicted_class}", (20, 40), font, 0.8, (0, 255, 0), 2)
+                    cv2.putText(frame, f"Confidence: {confidence:.2%}", (20, 70), font, 0.8, (0, 255, 0), 2)
+                    cv2.putText(frame, verification_status, (20, 100), font, 0.7, status_color, 2)
+                    cv2.putText(frame, sorting_instruction, (20, 130), font, 0.8, bin_color, 2)
+                    cv2.putText(frame, f"FPS: {fps:.1f}", (20, 160), font, 0.6, (0, 255, 0), 2)
+                    
+                    # Print sorting instruction to console (for logging/simulation)
+                    if fps_frame_count % 30 == 0:  # Print every 30 frames to avoid spam
+                        print(f"[SORTING] {predicted_class} -> {sorting_instruction} (Confidence: {confidence:.2%}) - AUTO CLASSIFIED")
+                
+                elif confidence >= 0.5:
+                    # Medium confidence (0.5 to 0.75): Needs verification
+                    sorting_instruction = self.sorting_mechanism.get_sorting_instruction(predicted_class)
+                    bin_color = self.sorting_mechanism.get_bin_color(predicted_class)
+                    
+                    cv2.rectangle(overlay, (10, 10), (550, 170), (0, 0, 0), -1)
+                    alpha = 0.7
+                    frame = cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0)
+                    
+                    # Display classification info with verification warning
+                    cv2.putText(frame, f"Class: {predicted_class}", (20, 40), font, 0.8, (0, 165, 255), 2)
+                    cv2.putText(frame, f"Confidence: {confidence:.2%}", (20, 70), font, 0.8, (0, 165, 255), 2)
+                    cv2.putText(frame, verification_status, (20, 100), font, 0.7, status_color, 2)
+                    cv2.putText(frame, sorting_instruction, (20, 130), font, 0.8, bin_color, 2)
+                    cv2.putText(frame, f"FPS: {fps:.1f}", (20, 160), font, 0.6, (0, 255, 0), 2)
+                    
+                    # Print sorting instruction to console (for logging/simulation)
+                    if fps_frame_count % 30 == 0:  # Print every 30 frames to avoid spam
+                        print(f"[SORTING] {predicted_class} -> {sorting_instruction} (Confidence: {confidence:.2%}) - NEEDS VERIFICATION")
+                
+                else:
+                    # Low confidence (< 0.5): Manual identification required
+                    cv2.rectangle(overlay, (10, 10), (550, 130), (0, 0, 0), -1)
+                    alpha = 0.7
+                    frame = cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0)
+                    
+                    # Display manual identification warning
+                    cv2.putText(frame, f"Predicted: {predicted_class}", (20, 40), font, 0.8, (0, 0, 255), 2)
+                    cv2.putText(frame, f"Confidence: {confidence:.2%}", (20, 70), font, 0.8, (0, 0, 255), 2)
+                    cv2.putText(frame, verification_status, (20, 100), font, 0.7, status_color, 2)
+                    cv2.putText(frame, f"FPS: {fps:.1f}", (20, 130), font, 0.6, (0, 255, 0), 2)
+                    
+                    # Print manual identification requirement to console
+                    if fps_frame_count % 30 == 0:  # Print every 30 frames to avoid spam
+                        print(f"[SORTING] {predicted_class} (Confidence: {confidence:.2%}) - MANUAL IDENTIFICATION REQUIRED")
 
             cv2.imshow('Webcam Prediction', frame)
 
