@@ -16,8 +16,7 @@ class CNN(nn.Module):
     def __init__(self, num_classes=12):
         super().__init__()
         self.features = nn.Sequential(
-            nn.Conv2d(3, 16, 3, padding=1), nn.BatchNorm2d(16), nn.ReLU(), nn.MaxPool2d(2, 2),
-            nn.Conv2d(16, 32, 3, padding=1), nn.BatchNorm2d(32), nn.ReLU(), nn.MaxPool2d(2, 2),
+            nn.Conv2d(3, 32, 3, padding=1), nn.BatchNorm2d(32), nn.ReLU(), nn.MaxPool2d(2, 2),
             nn.Conv2d(32, 64, 3, padding=1), nn.BatchNorm2d(64), nn.ReLU(), nn.MaxPool2d(2, 2),
             nn.Conv2d(64, 128, 3, padding=1), nn.BatchNorm2d(128), nn.ReLU(), nn.MaxPool2d(2, 2),
             nn.Conv2d(128, 256, 3, padding=1), nn.BatchNorm2d(256), nn.ReLU(), nn.MaxPool2d(2, 2),
@@ -25,9 +24,12 @@ class CNN(nn.Module):
         )
         self.classifier = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(512 * 3 * 3, 512),
+            nn.Linear(512 * 7 * 7, 1024),
             nn.ReLU(),
-            nn.Dropout(0.5),
+            nn.Dropout(0.6),
+            nn.Linear(1024, 512),
+            nn.ReLU(),
+            nn.Dropout(0.4),
             nn.Linear(512, num_classes)
         )
 
@@ -43,14 +45,19 @@ def load_model(model_path, num_classes, device):
     model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device)
     model.eval()
-    return model
+    return model, checkpoint.get('class_names', None)
 
 # ---- Main Evaluation ----
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    num_classes = 10
     model_path = "saved_models/best_model.pth"
     test_dir = "dataset/val"  # Update if needed
+
+    # Load checkpoint first to detect num_classes and class_names
+    checkpoint = torch.load(model_path, map_location=device, weights_only=True)
+    num_classes = len(checkpoint.get('class_names', []))
+    class_names_from_model = checkpoint.get('class_names', None)
+    print(f"Detected {num_classes} classes from checkpoint")
 
     # Data transforms (should match training)
     test_transform = transforms.Compose([
@@ -64,7 +71,7 @@ def main():
     test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
     # Load model
-    model = load_model(model_path, num_classes, device)
+    model, _ = load_model(model_path, num_classes, device)
 
     # Evaluate
     correct = 0
