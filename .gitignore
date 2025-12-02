@@ -1,0 +1,86 @@
+# ...existing code...
+# Recommended .gitignore for Python / ML projects
+
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+.venv/
+.conda/
+env.bak/
+
+# Editor / IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Notebook checkpoints
+.ipynb_checkpoints
+
+# Test / coverage
+.pytest_cache/
+coverage.xml
+htmlcov/
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs, outputs, tensorboard
+logs/
+runs/
+tensorboard/
+output/
+outputs/
+
+# Models, checkpoints, weights, compiled artifacts
+models/
+checkpoints/
+weights/
+*.h5
+*.hdf5
+*.pt
+*.pth
+*.ckpt
+*.pb
+*.onnx
+*.tflite
+
+# Large data / caches
+data/
+datasets/
+data_raw/
+data_processed/
+cache/
+*.npy
+*.npz
+*.mat
+
+# Secrets and environment files
+.env
+.env.local
+credentials.json
+*.pem
+*.key
+
+# Misc
+*.log
+*.tmp
+*.bak
+
+# Keep important repo files tracked
+!README.md
+!requirements.txt
+!*.py
