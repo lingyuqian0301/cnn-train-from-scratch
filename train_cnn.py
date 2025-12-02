@@ -170,6 +170,7 @@ class ModelSaver:
 
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    num_classes = 10
     batch_size = 8
     learning_rate = 5e-4
     num_epoch = 50
@@ -182,9 +183,6 @@ def main():
     # Dataset and loaders
     data_loader = Dataset(train_dir, val_dir, batch_size)
     train_loader, val_loader, class_names = data_loader.get_loaders()
-    num_classes = len(class_names)
-    print(f"Number of classes detected: {num_classes}")
-    print(f"Classes: {class_names}")
 
     # Model
     model = CNN(num_classes=num_classes)
