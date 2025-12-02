@@ -49,6 +49,9 @@ outputs/
 models/
 checkpoints/
 weights/
+garbage_classification/
+saved_models/
+dataset/
 *.h5
 *.hdf5
 *.pt
