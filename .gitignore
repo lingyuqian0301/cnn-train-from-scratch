@@ -87,3 +87,7 @@ credentials.json
 !README.md
 !requirements.txt
 !*.py
+
+# Excluded Python files (test/development files - override !*.py)
+test.py
+train2.py
