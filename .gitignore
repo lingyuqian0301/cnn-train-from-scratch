@@ -91,3 +91,6 @@ credentials.json
 # Excluded Python files (test/development files - override !*.py)
 test.py
 train2.py
+
+# Documentation files
+INTEGRATION_STATUS.md

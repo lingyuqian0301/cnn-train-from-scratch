@@ -23,7 +23,9 @@ spec = importlib.util.spec_from_file_location("object_detection", "object-detect
 object_detection = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(object_detection)
 WebcamPredictor = object_detection.WebcamPredictor
-SortingMechanism = object_detection.SortingMechanism
+
+# Import sorting simulator
+from sorting_simulator import SortingSimulator, SortingInstruction
 
 # Configure logging
 logging.basicConfig(
@@ -223,6 +225,7 @@ class DashboardRenderer:
             ("'q'", "Quit"),
             ("'s'", "Toggle Stats"),
             ("'r'", "Reset Stats"),
+            ("'e'", "Empty Bins"),
         ]
         
         for key, desc in controls:
@@ -256,7 +259,12 @@ class RealTimeClassificationApp:
         # Initialize inference engine
         logger.info(f"Loading model from {self.config.model_path}")
         self.inference_engine = WebcamPredictor(self.config.model_path)
-        self.sorting_simulator = self.inference_engine.sorting_mechanism
+        
+        # Initialize sorting simulator with JSON logging
+        self.sorting_simulator = SortingSimulator(
+            max_bin_capacity=100,
+            log_file=self.config.sorting_log_file
+        )
         
         logger.info("Application initialized")
     
@@ -311,20 +319,18 @@ class RealTimeClassificationApp:
             predicted_class, confidence = self.inference_engine.predict_frame(frame)
             
             if predicted_class is not None:
-                # Get verification status
+                # Generate sorting instruction using the new simulator
+                instruction: SortingInstruction = self.sorting_simulator.generate_instruction(
+                    predicted_class, confidence
+                )
+                
+                sorting_instruction = instruction.instruction_text
+                bin_location = instruction.bin_location
+                has_instruction = not instruction.requires_manual_review
+                
+                # Get verification status and bin color from sorting simulator
                 verification_status, status_color = self.sorting_simulator.get_verification_status(confidence)
-                
-                # Get sorting instruction if confidence >= 0.5
-                sorting_instruction = None
-                bin_location = None
-                bin_color = None
-                has_instruction = False
-                
-                if confidence >= 0.5:
-                    sorting_instruction = self.sorting_simulator.get_sorting_instruction(predicted_class)
-                    bin_location = self.sorting_simulator.bin_mapping.get(predicted_class.lower(), 'Bin E (General Waste)')
-                    bin_color = self.sorting_simulator.get_bin_color(predicted_class)
-                    has_instruction = True
+                bin_color = self.sorting_simulator.get_bin_color(predicted_class) if has_instruction else (128, 128, 128)
                 
                 # Update statistics
                 self.update_statistics(confidence, has_instruction)
@@ -381,9 +387,19 @@ class RealTimeClassificationApp:
                     'total_instructions': 0
                 }
                 logger.info("Statistics reset")
+            elif key == ord('e'):
+                # Empty all bins
+                self.sorting_simulator.empty_bins()
+                logger.info("All bins emptied")
         
         cap.release()
         cv2.destroyAllWindows()
+        
+        # Save sorting log before shutdown
+        if self.config.enable_logging:
+            self.sorting_simulator.save_log()
+            logger.info("Sorting log saved")
+        
         logger.info("Application shutdown complete")
     
     def shutdown(self):
