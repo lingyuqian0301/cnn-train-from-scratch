@@ -48,7 +48,7 @@ def load_model(model_path, num_classes, device):
 # ---- Main Evaluation ----
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    num_classes = 10
+    num_classes = 12
     model_path = "saved_models/best_model.pth"
     test_dir = "dataset/val"  # Update if needed
 
