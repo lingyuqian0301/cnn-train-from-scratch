@@ -1,0 +1,17 @@
+{
+  "model_path": "best_model.pth",
+  "confidence_threshold": 0.5,
+  "fps_target": 20,
+  "enable_webcam": true,
+  "enable_sorting": true,
+  "enable_logging": true,
+  "log_file": "logs/classifications.csv",
+  "sorting_log_file": "logs/sorting_log.json",
+  "display_fps": true,
+  "display_confidence": true,
+  "roi_top_margin": 300,
+  "roi_bottom_margin": 150,
+  "show_roi_indicator": true,
+  "debug_show_roi_window": true,
+  "highlight_duration": 1.5
+}
