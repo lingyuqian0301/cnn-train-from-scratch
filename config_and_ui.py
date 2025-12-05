@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class AppConfig:
     """Application configuration"""
-    model_path: str = "waste_classifier_best.pth"
+    model_path: str = "best_model.pth"
     confidence_threshold: float = 0.5
     fps_target: int = 20
     enable_webcam: bool = True
