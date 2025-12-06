@@ -1,3 +1,6 @@
+#dataset we use to train
+1. [Garbage Classification Dataset](https://www.kaggle.com/datasets/mostafaabla/garbage-classification) by Mostafa Abla
+
 # How to Run the Waste Classification System
 
 ## Prerequisites
